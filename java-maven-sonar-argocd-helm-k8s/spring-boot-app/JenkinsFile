@@ -40,6 +40,34 @@ pipeline {
         }
       }
     }
+    stage('Push to AWS ECR') {
+  environment {
+    AWS_ACCOUNT_ID = "448049794475"    // replace
+    AWS_REGION     = "us-east-1"       // replace
+    ECR_REPO       = "jen-app"         // replace
+  }
+  steps {
+    withCredentials([usernamePassword(credentialsId: 'aws-cred',
+                                      usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                      passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+      sh '''
+        # export creds (they're available as env vars inside this block)
+        export AWS_REGION=${AWS_REGION}
+        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+        # login to ECR
+        aws ecr get-login-password --region ${AWS_REGION} | \
+          docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+        # tag and push
+        docker tag ${DOCKER_IMAGE} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+        docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+      '''
+    }
+  }
+}
+
     stage('Update Deployment File') {
         environment {
             GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
